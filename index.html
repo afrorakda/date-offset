@@ -39,7 +39,6 @@
         h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 8px; letter-spacing: -1px; }
         .subtitle { font-size: 0.85rem; color: #666; font-weight: 500; margin-bottom: 30px; }
 
-        /* Input Styles */
         .section-label {
             display: block;
             text-align: left;
@@ -72,7 +71,6 @@
         }
         input::placeholder { color: #bbb; -webkit-text-fill-color: #bbb; }
 
-        /* Quick Buttons */
         .quick-btns {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
@@ -91,7 +89,6 @@
         }
         .btn-mini:active { background: #ddd; }
 
-        /* Result Display */
         .result-card {
             background: var(--main);
             color: #fff;
@@ -104,20 +101,25 @@
         .result-date { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; }
         .result-sub { font-size: 0.9rem; font-weight: 500; margin-top: 5px; opacity: 0.9; }
 
+        /* Clear Button Adjustment */
         .clear-btn {
             position: absolute;
             right: 15px;
-            top: 15px;
+            top: 50%;
+            transform: translateY(-50%);
             background: none;
             border: none;
-            color: #ccc;
-            font-size: 1.2rem;
+            color: #999;
+            font-size: 1.5rem;
+            line-height: 1;
             cursor: pointer;
             display: none;
+            padding: 5px;
+            z-index: 2;
         }
         .clear-btn.active { display: block; }
+        .clear-btn:active { color: var(--main); }
 
-        /* Footer & UI Elements */
         footer { margin-top: 50px; font-size: 11px; color: #aaa; line-height: 1.8; }
         footer a { color: inherit; text-decoration: none; }
         .footer-btns { margin-top: 30px; }
@@ -141,6 +143,17 @@
             border-radius: var(--radius); text-align: left; position: relative;
         }
         .close-x { position: absolute; top: 15px; right: 20px; font-size: 20px; color: #ccc; cursor: pointer; }
+
+        select {
+            -webkit-appearance: none;
+            background: var(--input-bg);
+            border: 2px solid var(--accent);
+            border-radius: var(--radius);
+            font-weight: 700;
+            padding: 0 15px;
+            outline: none;
+            color: var(--main);
+        }
     </style>
 </head>
 <body>
@@ -150,9 +163,11 @@
     <p class="subtitle">Fastest target date calculator.</p>
 
     <div class="input-group">
-        <label class="section-label">Base Date (MMDD or MMDDYYYY)</label>
-        <input type="tel" id="baseDateInput" placeholder="0405" maxlength="8">
-        <button class="clear-btn" id="clr-base" onclick="resetBase()">×</button>
+        <label class="section-label">Base Date (e.g. 0405, 260405, 20260405)</label>
+        <div style="position: relative;">
+            <input type="tel" id="baseDateInput" placeholder="0405" maxlength="8">
+            <button class="clear-btn" id="clr-base" onclick="resetBase()">×</button>
+        </div>
         <div class="quick-btns">
             <button class="btn-mini" onclick="setRelativeDate(-1)">Yesterday</button>
             <button class="btn-mini" onclick="setRelativeDate(0)">Today</button>
@@ -161,12 +176,12 @@
     </div>
 
     <div class="input-group">
-        <label class="section-label">Offset (Days / Months / Years)</label>
+        <label class="section-label">Offset (e.g. +45, -60)</label>
         <div style="display: flex; gap: 8px;">
             <div style="flex: 2; position: relative;">
-                <input type="number" id="offsetValue" placeholder="+45">
+                <input type="text" id="offsetValue" placeholder="+45" inputmode="text">
             </div>
-            <select id="offsetUnit" style="flex: 1; border: 2px solid var(--accent); border-radius: var(--radius); background: var(--input-bg); font-weight: 700; padding: 5px; outline: none; -webkit-appearance: none;">
+            <select id="offsetUnit" style="flex: 1;">
                 <option value="days">Days</option>
                 <option value="months">Months</option>
                 <option value="years">Years</option>
@@ -202,8 +217,6 @@
 </div>
 
 <script>
-    let currentBaseDate = new Date();
-
     const baseInput = document.getElementById('baseDateInput');
     const offsetInput = document.getElementById('offsetValue');
     const offsetUnit = document.getElementById('offsetUnit');
@@ -219,7 +232,6 @@
     function setRelativeDate(offset) {
         const d = new Date();
         d.setDate(d.getDate() + offset);
-        currentBaseDate = d;
         baseInput.value = formatDateToInput(d);
         updateClearBtn();
         calculate();
@@ -232,23 +244,44 @@
     }
 
     function parseInputDate(val) {
+        if (!val) return null;
         const now = new Date();
-        let year = now.getFullYear();
-        let month, day;
+        let y = now.getFullYear();
+        let m, d;
 
         if (val.length === 4) {
-            month = parseInt(val.substring(0, 2)) - 1;
-            day = parseInt(val.substring(2, 4));
+            // MMDD
+            m = parseInt(val.substring(0, 2)) - 1;
+            d = parseInt(val.substring(2, 4));
+        } else if (val.length === 6) {
+            const part1 = parseInt(val.substring(0, 2));
+            const part3 = parseInt(val.substring(4, 6));
+            if (part1 >= 20) { // YYMMDD
+                y = 2000 + part1;
+                m = parseInt(val.substring(2, 4)) - 1;
+                d = part3;
+            } else { // MMDDYY
+                y = 2000 + part3;
+                m = part1 - 1;
+                d = parseInt(val.substring(2, 4));
+            }
         } else if (val.length === 8) {
-            month = parseInt(val.substring(0, 2)) - 1;
-            day = parseInt(val.substring(2, 4));
-            year = parseInt(val.substring(4, 8));
+            const part1 = parseInt(val.substring(0, 4));
+            if (part1 > 1900) { // YYYYMMDD
+                y = part1;
+                m = parseInt(val.substring(4, 6)) - 1;
+                d = parseInt(val.substring(6, 8));
+            } else { // MMDDYYYY
+                m = parseInt(val.substring(0, 2)) - 1;
+                d = parseInt(val.substring(2, 4));
+                y = parseInt(val.substring(4, 8));
+            }
         } else {
             return null;
         }
 
-        const d = new Date(year, month, day);
-        return (d.getMonth() === month && d.getDate() === day) ? d : null;
+        const dateObj = new Date(y, m, d);
+        return (dateObj.getFullYear() === y && dateObj.getMonth() === m && dateObj.getDate() === d) ? dateObj : null;
     }
 
     function calculate() {
@@ -261,7 +294,8 @@
             return;
         }
 
-        const offset = parseInt(offsetInput.value) || 0;
+        const offsetStr = offsetInput.value.replace(/[^0-9-]/g, '');
+        const offset = parseInt(offsetStr) || 0;
         const unit = offsetUnit.value;
         const target = new Date(parsed);
 
@@ -275,13 +309,14 @@
     }
 
     function updateClearBtn() {
-        clrBase.classList.toggle('active', baseInput.value.length > 0);
+        clrBase.style.display = baseInput.value.length > 0 ? 'block' : 'none';
     }
 
     function resetBase() {
         baseInput.value = '';
         updateClearBtn();
         baseInput.focus();
+        calculate();
     }
 
     baseInput.addEventListener('input', () => {
