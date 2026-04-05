@@ -135,6 +135,7 @@
             font-weight: 700;
             opacity: 0;
             transition: opacity 0.3s;
+            pointer-events: none;
         }
 
         footer { margin-top: 50px; font-size: 11px; color: #aaa; line-height: 1.8; }
@@ -321,11 +322,6 @@
             resultDisplay.innerText = "Waiting...";
             resultWeekday.innerText = "Check date format";
             return;
-        }
-
-        // Auto focus to offset if base is complete
-        if ([4, 6, 8].includes(val.length) && document.activeElement === baseInput) {
-            setTimeout(() => offsetInput.focus(), 100);
         }
 
         const offsetStr = offsetInput.value.replace(/[^0-9-]/g, '');
