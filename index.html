@@ -80,7 +80,7 @@
         .btn-mini {
             background: var(--accent);
             border: none;
-            padding: 8px;
+            padding: 10px;
             border-radius: 10px;
             font-size: 0.75rem;
             font-weight: 700;
@@ -96,12 +96,15 @@
             border-radius: var(--radius);
             margin-top: 30px;
             text-align: center;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.1s;
         }
+        .result-card:active { transform: scale(0.98); }
         .result-label { font-size: 0.7rem; font-weight: 600; opacity: 0.7; margin-bottom: 5px; }
         .result-date { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; }
         .result-sub { font-size: 0.9rem; font-weight: 500; margin-top: 5px; opacity: 0.9; }
 
-        /* Clear Button Adjustment */
         .clear-btn {
             position: absolute;
             right: 15px;
@@ -118,7 +121,21 @@
             z-index: 2;
         }
         .clear-btn.active { display: block; }
-        .clear-btn:active { color: var(--main); }
+
+        .toast {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--main);
+            color: #fff;
+            padding: 5px 15px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
 
         footer { margin-top: 50px; font-size: 11px; color: #aaa; line-height: 1.8; }
         footer a { color: inherit; text-decoration: none; }
@@ -163,7 +180,7 @@
     <p class="subtitle">Fastest target date calculator.</p>
 
     <div class="input-group">
-        <label class="section-label">Base Date (e.g. 0405, 260405, 20260405)</label>
+        <label class="section-label">Base Date (e.g. 0405, 260405)</label>
         <div style="position: relative;">
             <input type="tel" id="baseDateInput" placeholder="0405" maxlength="8">
             <button class="clear-btn" id="clr-base" onclick="resetBase()">×</button>
@@ -176,10 +193,10 @@
     </div>
 
     <div class="input-group">
-        <label class="section-label">Offset (e.g. +45, -60)</label>
+        <label class="section-label">Offset (e.g. 45, -60)</label>
         <div style="display: flex; gap: 8px;">
             <div style="flex: 2; position: relative;">
-                <input type="text" id="offsetValue" placeholder="+45" inputmode="text">
+                <input type="text" id="offsetValue" placeholder="45" inputmode="text">
             </div>
             <select id="offsetUnit" style="flex: 1;">
                 <option value="days">Days</option>
@@ -187,10 +204,16 @@
                 <option value="years">Years</option>
             </select>
         </div>
+        <div class="quick-btns">
+            <button class="btn-mini" onclick="setOffset(7)">7 days</button>
+            <button class="btn-mini" onclick="setOffset(30)">30 days</button>
+            <button class="btn-mini" onclick="setOffset(90)">90 days</button>
+        </div>
     </div>
 
-    <div class="result-card">
-        <div class="result-label" id="resultLabel">Target Date</div>
+    <div class="result-card" id="copyTrigger" onclick="copyToClipboard()">
+        <div class="toast" id="toast">Copied!</div>
+        <div class="result-label">Target Date (Tap to copy)</div>
         <div class="result-date" id="resultDisplay">-</div>
         <div class="result-sub" id="resultWeekday">-</div>
     </div>
@@ -223,6 +246,7 @@
     const resultDisplay = document.getElementById('resultDisplay');
     const resultWeekday = document.getElementById('resultWeekday');
     const clrBase = document.getElementById('clr-base');
+    const toast = document.getElementById('toast');
 
     function init() {
         setRelativeDate(0);
@@ -234,6 +258,12 @@
         d.setDate(d.getDate() + offset);
         baseInput.value = formatDateToInput(d);
         updateClearBtn();
+        calculate();
+    }
+
+    function setOffset(val) {
+        offsetInput.value = val;
+        offsetUnit.value = 'days';
         calculate();
     }
 
@@ -250,28 +280,27 @@
         let m, d;
 
         if (val.length === 4) {
-            // MMDD
             m = parseInt(val.substring(0, 2)) - 1;
             d = parseInt(val.substring(2, 4));
         } else if (val.length === 6) {
             const part1 = parseInt(val.substring(0, 2));
             const part3 = parseInt(val.substring(4, 6));
-            if (part1 >= 20) { // YYMMDD
+            if (part1 >= 20) { 
                 y = 2000 + part1;
                 m = parseInt(val.substring(2, 4)) - 1;
                 d = part3;
-            } else { // MMDDYY
+            } else { 
                 y = 2000 + part3;
                 m = part1 - 1;
                 d = parseInt(val.substring(2, 4));
             }
         } else if (val.length === 8) {
             const part1 = parseInt(val.substring(0, 4));
-            if (part1 > 1900) { // YYYYMMDD
+            if (part1 > 1900) { 
                 y = part1;
                 m = parseInt(val.substring(4, 6)) - 1;
                 d = parseInt(val.substring(6, 8));
-            } else { // MMDDYYYY
+            } else { 
                 m = parseInt(val.substring(0, 2)) - 1;
                 d = parseInt(val.substring(2, 4));
                 y = parseInt(val.substring(4, 8));
@@ -292,6 +321,11 @@
             resultDisplay.innerText = "Waiting...";
             resultWeekday.innerText = "Check date format";
             return;
+        }
+
+        // Auto focus to offset if base is complete
+        if ([4, 6, 8].includes(val.length) && document.activeElement === baseInput) {
+            setTimeout(() => offsetInput.focus(), 100);
         }
 
         const offsetStr = offsetInput.value.replace(/[^0-9-]/g, '');
@@ -317,6 +351,19 @@
         updateClearBtn();
         baseInput.focus();
         calculate();
+    }
+
+    async function copyToClipboard() {
+        const text = `${resultDisplay.innerText} (${resultWeekday.innerText})`;
+        if (resultDisplay.innerText === "-" || resultDisplay.innerText === "Waiting...") return;
+        
+        try {
+            await navigator.clipboard.writeText(text);
+            toast.style.opacity = "1";
+            setTimeout(() => toast.style.opacity = "0", 1500);
+        } catch (err) {
+            console.error('Failed to copy', err);
+        }
     }
 
     baseInput.addEventListener('input', () => {
